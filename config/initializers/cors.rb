@@ -10,7 +10,7 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
 
   allow do
     # Allow requests from api.unishala.in (production or staging)
-    origins 'https://www.unishala.in'
+    origins 'https://www.unishala.in/'
 
     resource '*',
       headers: :any,
