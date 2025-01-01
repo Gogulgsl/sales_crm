@@ -3,11 +3,8 @@ class School < ApplicationRecord
   belongs_to :group_school, class_name: 'School', optional: true
   belongs_to :created_by, class_name: 'User', foreign_key: :createdby_user_id, optional: true
   belongs_to :updated_by, class_name: 'User', foreign_key: :updatedby_user_id, optional: true
-  has_many :contacts, dependent: :destroy
-
-  # Nested Attributes
+  has_many :contacts
   accepts_nested_attributes_for :contacts, allow_destroy: true
-
   # Validations
   validates :name, presence: true
   validates :location, presence: true

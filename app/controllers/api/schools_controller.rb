@@ -21,11 +21,6 @@ class Api::SchoolsController < ApplicationController
     render json: format_school_data(@school)
   end
 
-  # GET /schools/new
-  def new
-    @school = School.new
-  end
-
   # POST /schools
   def create
     ActiveRecord::Base.transaction do
@@ -56,6 +51,7 @@ class Api::SchoolsController < ApplicationController
                      []
                    end
 
+        # Return school data along with contacts
         render json: { school: format_school_data(@school), contacts: contacts }, status: :created
       else
         render json: { errors: @school.errors.full_messages }, status: :unprocessable_entity
@@ -130,26 +126,28 @@ class Api::SchoolsController < ApplicationController
 
   def school_params
     params.require(:school).permit(
-      :name, :lead_source, :location, :city, :state, :pincode, :number_of_students,
-      :avg_fees, :board, :website, :part_of_group_school, :latitude, :longitude, :is_active
+      :name, :email, :lead_source, :location, :city, :state, :pincode,
+      :number_of_students, :avg_fees, :board, :website, :part_of_group_school,
+      :group_school_id, :createdby_user_id, :updatedby_user_id, :latitude,
+      :longitude, :is_active, contacts_attributes: [:contact_name, :mobile, :decision_maker]
     )
   end
 
   def create_or_update_contacts(contacts_params, school_id)
     contacts_params.map do |contact_data|
-      if contact_data[:id].present?
-        contact = Contact.find_by(id: contact_data[:id], school_id: school_id)
-        if contact
-          contact.update!(
-            contact_name: contact_data[:contact_name],
-            mobile: contact_data[:mobile],
-            decision_maker: contact_data[:decision_maker]
-          )
-          contact
-        else
-          raise ActiveRecord::RecordNotFound, "Contact with ID #{contact_data[:id]} not found"
-        end
+      # Look for an existing contact by mobile
+      existing_contact = Contact.find_by(mobile: contact_data[:mobile])
+
+      if existing_contact
+        # Update contact details and associate with the correct school_id
+        existing_contact.update!(
+          contact_name: contact_data[:contact_name],
+          decision_maker: contact_data[:decision_maker],
+          school_id: school_id # Ensure the contact is associated with the correct school
+        )
+        existing_contact
       else
+        # Create a new contact if it doesn't exist
         Contact.create!(
           contact_name: contact_data[:contact_name],
           mobile: contact_data[:mobile],
@@ -171,7 +169,7 @@ class Api::SchoolsController < ApplicationController
   def format_school_data(school)
     school.as_json.merge({
       group_school: school.group_school ? school.group_school.slice(:id, :name) : {},
-      contacts: school.contacts.present? ? school.contacts : []
+      contacts: school.contacts.select(:id, :contact_name, :mobile, :decision_maker)
     })
   end
 
@@ -180,7 +178,6 @@ class Api::SchoolsController < ApplicationController
   end
 
   def current_user
-    # Placeholder for user authentication logic
     @current_user ||= User.find_by(id: decoded_token&.dig('user_id'))
   end
 end

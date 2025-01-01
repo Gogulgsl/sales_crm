@@ -115,7 +115,7 @@ module Api
     # Only allow a trusted parameter "white list" through.
     def daily_status_params
       params.require(:daily_status).permit(
-        :user_id, :opportunity_id, :follow_up, :designation, :mail_id,
+        :user_id, :opportunity_id, :follow_up, :designation, :email,
         :discussion_point, :next_steps, :stage, :decision_maker_contact_id,
         :person_met_contact_id, :school_id, :status
       )

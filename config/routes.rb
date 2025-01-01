@@ -1,6 +1,5 @@
 Rails.application.routes.draw do
-  # For details on the DSL available within this file, see https://guides.rubyonrails.org/routing.html
-   namespace :api do
+  namespace :api do
     resources :users do
       collection do
         get :reporting_managers
@@ -9,5 +8,38 @@ Rails.application.routes.draw do
       end
     end
     resources :sales_teams
+    resources :products do 
+      collection do 
+        get :active_products
+      end
+    end 
+    resources :schools do
+      collection do
+        post :upload
+        get :active_schools
+      end
+      member do
+        get :contacts
+        put :update_contacts
+      end
+    end
+    resources :opportunities do
+      collection do
+        post :add_opportunities, to: 'opportunities#create'
+        get :my_opportunities
+        get :active_opportunities
+      end
+    end
+    resources :auth, only: [] do
+      collection do
+        post :login
+      end
+    end    
+    resources :daily_statuses
+    resources :contacts do 
+      collection do 
+        get :active_contacts
+      end 
+    end
   end
 end

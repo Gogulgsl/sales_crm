@@ -19,15 +19,25 @@ module Api
 
     # POST /contacts
     def create
-      @contact = Contact.new(contact_params)
-      @contact.createdby_user_id = current_user.id # Assuming you have `current_user`
+      # Check if a contact with the same mobile number already exists
+      existing_contact = Contact.find_by(mobile: contact_params[:mobile])
 
-      if @contact.save
-        render json: @contact, status: :created
+      if existing_contact
+        render json: { error: "A contact with this mobile number already exists." }, status: :unprocessable_entity
       else
-        render json: @contact.errors, status: :unprocessable_entity
+        @contact = Contact.new(contact_params)
+
+        @contact.createdby_user_id = current_user&.id
+
+        if @contact.save
+          render json: @contact, status: :created
+        else
+          render json: @contact.errors, status: :unprocessable_entity
+        end
       end
     end
+
+
 
     def active_contacts
       contacts = Contact.where(is_active: true)

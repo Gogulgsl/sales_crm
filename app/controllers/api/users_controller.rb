@@ -21,7 +21,7 @@ class Api::UsersController < ApplicationController
     render json: user
   end
 
- def create
+  def create
     user = User.new(user_params)
     
     if user.save
@@ -70,7 +70,7 @@ class Api::UsersController < ApplicationController
   end
 
   def forgot_password
-    user = User.find_by(email_id: params[:email_id]) # Or use :username depending on your app
+    user = User.find_by(email: params[:email]) # Changed to :email
     
     if user
       reset_token = SecureRandom.hex(10) # Generate a random reset token
@@ -82,7 +82,6 @@ class Api::UsersController < ApplicationController
       render json: { error: "User not found." }, status: :not_found
     end
   end
-
 
   def reset_password
     token = params[:reset_token]
@@ -114,10 +113,10 @@ class Api::UsersController < ApplicationController
   private
 
   def user_params
-    params.require(:user).permit(:username, :password, :role, :reporting_manager_id, :email_id, :mobile_number, :is_active)
+    params.require(:user).permit(:username, :password, :role, :reporting_manager_id, :email, :mobile_number, :is_active) # Changed :email_id to :email
   end
 
   def user_update_params
-    params.require(:user).permit(:username, :role, :reporting_manager_id, :email_id, :mobile_number, :is_active)
+    params.require(:user).permit(:username, :role, :reporting_manager_id, :email, :mobile_number, :is_active) # Changed :email_id to :email
   end
 end
