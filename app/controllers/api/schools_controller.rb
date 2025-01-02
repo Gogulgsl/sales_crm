@@ -69,14 +69,16 @@ class Api::SchoolsController < ApplicationController
   # PATCH/PUT /schools/:id
   def update
     ActiveRecord::Base.transaction do
-      group_school = find_or_create_group_school(params[:school][:group_school]) if params[:school][:group_school]
+      if params[:school][:part_of_group_school] && params[:school][:group_school_id].blank?
+        group_school = create_or_find_group_school(params[:school][:group_school])
+        params[:school][:group_school_id] = group_school.id
+      end
 
-      if @school.update(school_params.merge(group_school_id: group_school&.id))
+      if @school.update(school_params)
         contacts = create_or_update_contacts(params[:school][:contacts], @school.id) if params[:school][:contacts]
-        render json: { school: @school, contacts: contacts }, status: :ok
+        render json: { school: format_school_data(@school), contacts: contacts }, status: :ok
       else
         render json: { errors: @school.errors.full_messages }, status: :unprocessable_entity
-        raise ActiveRecord::Rollback
       end
     end
   rescue ActiveRecord::RecordInvalid => e
