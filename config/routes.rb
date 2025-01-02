@@ -17,6 +17,7 @@ Rails.application.routes.draw do
       collection do
         post :upload
         get :active_schools
+        get :head_quarters
       end
       member do
         get :contacts

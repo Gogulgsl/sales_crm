@@ -85,6 +85,17 @@ class Api::SchoolsController < ApplicationController
     head :no_content
   end
 
+  # GET /schools/head_quarters
+  def head_quarters
+    schools = School.includes(:group_school).where(part_of_group_school: false)
+
+    if schools.any?
+      render json: schools.map { |school| format_school_data(school) }, status: :ok
+    else
+      render json: { message: 'No head_quarters found' }, status: :not_found
+    end
+  end
+
   # GET /schools/:id/contacts
   def contacts
     contacts = @school.contacts.select(:id, :contact_name, :mobile, :decision_maker)
