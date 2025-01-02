@@ -65,7 +65,7 @@ module Api
     end
 
     def contact_params
-      params.require(:contact).permit(:contact_name, :mobile, :decision_maker, :school_id, :designation, :is_active)
+      params.require(:contact).permit(:contact_name, :mobile, :decision_maker, :school_id, :designation, :is_active, :createdby_user_id, :updatedby_user_id)
     end
   end
 end
