@@ -140,7 +140,7 @@ class Api::SchoolsController < ApplicationController
       :name, :email, :lead_source, :location, :city, :state, :pincode,
       :number_of_students, :avg_fees, :board, :website, :part_of_group_school,
       :group_school_id, :createdby_user_id, :updatedby_user_id, :latitude,
-      :longitude, :is_active, contacts_attributes: [:contact_name, :mobile, :decision_maker]
+      :longitude, :is_active, contacts_attributes: [:contact_name, :mobile, :decision_maker, :designation]
     )
   end
 
@@ -154,7 +154,8 @@ class Api::SchoolsController < ApplicationController
         existing_contact.update!(
           contact_name: contact_data[:contact_name],
           decision_maker: contact_data[:decision_maker],
-          school_id: school_id # Ensure the contact is associated with the correct school
+          designation: contact_data[:designation],
+          school_id: school_id 
         )
         existing_contact
       else
@@ -163,6 +164,7 @@ class Api::SchoolsController < ApplicationController
           contact_name: contact_data[:contact_name],
           mobile: contact_data[:mobile],
           decision_maker: contact_data[:decision_maker],
+          designation: contact_data[:designation],
           school_id: school_id
         )
       end
@@ -180,7 +182,7 @@ class Api::SchoolsController < ApplicationController
   def format_school_data(school)
     school.as_json.merge({
       group_school: school.group_school ? school.group_school.slice(:id, :name) : {},
-      contacts: school.contacts.select(:id, :contact_name, :mobile, :decision_maker)
+      contacts: school.contacts.select(:id, :contact_name, :mobile, :decision_maker, :designation)
     })
   end
 
