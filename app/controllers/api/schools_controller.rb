@@ -177,7 +177,7 @@ class Api::SchoolsController < ApplicationController
     end
   end
 
-  def find_or_create_group_school(group_school_params)
+  def create_or_find_group_school(group_school_params)
     return unless group_school_params
 
     School.find_or_create_by!(name: group_school_params[:name]) do |school|
