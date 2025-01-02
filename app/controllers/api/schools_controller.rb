@@ -1,17 +1,21 @@
 class Api::SchoolsController < ApplicationController
   before_action :set_school, only: %i[show edit update destroy contacts update_contacts]
-  before_action :authorize_user, except: [:index, :show, :active_schools]
-  before_action -> { authorize_role('admin', 'sales_executive') }, only: [:index]
+  before_action :authorize_user, except: [:show, :active_schools]
+  before_action -> { authorize_role('admin', 'sales_executive', 'sales_head') }, only: [:index]
 
   # GET /schools
   def index
-    schools = if current_user.role == 'admin'
-                School.includes(:group_school).all
-              elsif current_user.role == 'sales_executive'
-                School.includes(:group_school).where(is_active: true)
-              else
-                []
-              end
+    if current_user.role == 'admin'
+      schools = School.includes(:group_school).all
+    elsif current_user.role == 'sales_head'
+      reporting_users = User.where(reporting_manager_id: current_user.id).pluck(:id)
+      relevant_user_ids = [current_user.id] + reporting_users
+      schools = School.includes(:group_school).where(id: Opportunity.where(user_id: relevant_user_ids).pluck(:school_id))
+    elsif current_user.role == 'sales_executive'
+      schools = School.includes(:group_school).where(id: Opportunity.where(user_id: current_user.id).pluck(:school_id))
+    else
+      schools = []
+    end
 
     render json: schools.map { |school| format_school_data(school) }, status: :ok
   end

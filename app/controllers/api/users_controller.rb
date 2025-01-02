@@ -48,7 +48,7 @@ class Api::UsersController < ApplicationController
   end
 
   def reporting_managers
-    admin_and_manager_users = User.where(role: ['admin', 'manager'])
+    admin_and_manager_users = User.where(role: ['admin', 'sales_head'])
 
     render json: admin_and_manager_users.as_json(only: [:id, :username, :role, :created_at, :updated_at])
   end

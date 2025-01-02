@@ -2,41 +2,38 @@ module Api
   class DailyStatusesController < ApplicationController
    
     before_action :set_daily_status, only: [:show, :edit, :update, :destroy]
-    before_action :authorize_sales_executive, only: [:create]
+    before_action :authorize_sales_executive_or_head, only: [:create]
     before_action :authorize_admin, only: [:update]
 
     # GET /daily_statuses
     def index
-      if current_user.role == 'sales_executive'
-        # Restrict to daily statuses created by the logged-in sales executive
-        @daily_statuses = DailyStatus.includes(
-          :decision_maker_contact, 
-          :person_met_contact, 
-          :user, 
-          :school,
-          opportunity: :product
-        ).where(user_id: current_user.id)
-      else
-        # Admins or other roles can view all daily statuses
-        @daily_statuses = DailyStatus.includes(
-          :decision_maker_contact, 
-          :person_met_contact, 
-          :user, 
-          :school,
-          opportunity: :product
-        )
-      end
+      @daily_statuses = if current_user.role == 'admin'
+                          # Admin can view all daily statuses
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product).all
+                        elsif current_user.role == 'sales_head'
+                          # Fetch reporting sales executives using sales_team
+                          reporting_users = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
+                                     .where(user_id: [current_user.id] + reporting_users)
+                        elsif current_user.role == 'sales_executive'
+                          # Sales executives can view only their own daily statuses
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
+                                     .where(user_id: current_user.id)
+                        else
+                          # Fallback for unauthorized roles
+                          return render json: { error: 'Unauthorized access' }, status: :forbidden
+                        end
 
       render json: @daily_statuses.as_json(
         include: {
-          decision_maker_contact: { only: [:id, :contact_name, :mobile, :decision_maker] },
-          person_met_contact: { only: [:id, :contact_name, :mobile, :decision_maker] },
+          decision_maker_contact: { only: [:id, :contact_name, :mobile, :decision_maker, :designation] },
+          person_met_contact: { only: [:id, :contact_name, :mobile, :decision_maker, :designation] },
           user: { only: [:id, :username] },
           school: { only: [:id, :name] },
           opportunity: {
             only: [:id, :opportunity_name],
             include: {
-              product: { only: [:id, :product_name] } 
+              product: { only: [:id, :product_name] }
             }
           }
         }
@@ -99,9 +96,9 @@ module Api
     end
 
     # Restrict creation to sales executives
-    def authorize_sales_executive
-      unless current_user&.role == 'sales_executive'
-        render json: { error: 'Only sales executives can create daily statuses.' }, status: :forbidden
+    def authorize_sales_executive_or_head
+      unless current_user&.role.in?(['sales_executive', 'sales_head'])
+        render json: { error: 'Only sales executives and sales heads can create daily statuses.' }, status: :forbidden
       end
     end
 

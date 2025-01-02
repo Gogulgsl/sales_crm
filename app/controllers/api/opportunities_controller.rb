@@ -1,10 +1,28 @@
 class Api::OpportunitiesController < ApplicationController
-  before_action :authorize_user, except: [:index, :show, :active_opportunities]
+  before_action :authorize_user, except: [:show, :active_opportunities]
   before_action :set_opportunity, only: [:show, :update, :destroy]
 
   # GET /api/opportunities
   def index
-    opportunities = Opportunity.includes(:product, :school, :user, :contact).all
+    case current_user.role
+    when 'admin'
+      opportunities = Opportunity.includes(:product, :school, :user, :contact).all
+
+    when 'sales_head'
+      reporting_executives = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
+      opportunities = Opportunity.includes(:product, :school, :user, :contact)
+                                  .where(user_id: [current_user.id] + reporting_executives)
+
+    when 'sales_executive'
+      opportunities = Opportunity.includes(:product, :school, :user, :contact)
+                                  .where(user_id: current_user.id)
+
+    else
+      # If the role is unrecognized, return unauthorized error
+      render json: { error: 'Unauthorized access' }, status: :forbidden
+      return
+    end
+
     render json: opportunities.as_json(include: [:product, :school, :user, :contact]), status: :ok
   end
 
@@ -18,18 +36,6 @@ class Api::OpportunitiesController < ApplicationController
     opportunities = Opportunity.includes(:product, :school, :user, :contact)
                                 .where(is_active: true)
     render json: opportunities.as_json(include: [:product, :school, :user, :contact]), status: :ok
-  end
-
-  # GET /api/opportunities/my_opportunities
-  def my_opportunities
-    opportunities = Opportunity.includes(:product, :school, :user, :contact)
-                                .where(user_id: current_user.id, is_active: true)
-
-    if opportunities.exists?
-      render json: opportunities.as_json(include: [:product, :school, :user, :contact]), status: :ok
-    else
-      render json: { error: 'No opportunities found for the user' }, status: :not_found
-    end
   end
 
   # POST /api/opportunities
