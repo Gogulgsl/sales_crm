@@ -81,7 +81,7 @@ class Api::OpportunitiesController < ApplicationController
     params.require(:opportunity).permit(
       :school_id, :product_id, :start_date, :user_id, 
       :opportunity_name, :createdby_user_id, :updatedby_user_id, 
-      :last_stage, :is_active, :contact_id
+      :last_stage, :is_active, :contact_id, :zone
     )
   end
 
