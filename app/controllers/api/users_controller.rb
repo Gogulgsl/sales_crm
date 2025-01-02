@@ -1,20 +1,21 @@
 class Api::UsersController < ApplicationController
-  def index
-    users = User.includes(:manager_user).all
+ def index
+  users = User.includes(:manager_user).all
 
-    users_data = users.map do |user|
-      user_data = user.as_json
+  users_data = users.map do |user|
+    user_data = user.as_json
 
-      if user.role == 'sales_executive' && user.manager_user
-        # Include manager details in the user response
-        user_data[:manager_user] = user.manager_user.as_json(only: [:id, :username, :role]) # You can choose which fields to show
-      end
-
-      user_data
+    # Check if the user has a reporting manager
+    if user.reporting_manager_id.present?
+      # Include reporting manager's ID and name in the user response
+      reporting_manager = User.find_by(id: user.reporting_manager_id)
+      user_data[:reporting_manager] = { id: reporting_manager&.id, name: reporting_manager&.username, role: reporting_manager.role}
     end
-
-    render json: users_data
+    user_data
   end
+
+  render json: users_data
+end
 
   def show
     user = User.find(params[:id])
@@ -26,7 +27,7 @@ class Api::UsersController < ApplicationController
     
     if user.save
       # Set manager_user_id to nil for admin users
-      manager_user_id = user.role == 'admin' ? nil : user.reporting_manager_id
+      manager_user_id = ['admin', 'vp_sales'].include?(user.role) ? nil : user.reporting_manager_id
       
       # Create the SalesTeam with the correct manager_user_id
       sales_team = SalesTeam.create(
@@ -48,7 +49,7 @@ class Api::UsersController < ApplicationController
   end
 
   def reporting_managers
-    admin_and_manager_users = User.where(role: ['admin', 'sales_head'])
+    admin_and_manager_users = User.where(role: ['admin', 'sales_head', 'vp_sales'])
 
     render json: admin_and_manager_users.as_json(only: [:id, :username, :role, :created_at, :updated_at])
   end

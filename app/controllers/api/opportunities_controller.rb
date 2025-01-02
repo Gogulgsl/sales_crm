@@ -5,7 +5,7 @@ class Api::OpportunitiesController < ApplicationController
   # GET /api/opportunities
   def index
     case current_user.role
-    when 'admin'
+    when 'admin', 'vp_sales'
       opportunities = Opportunity.includes(:product, :school, :user, :contact).all
 
     when 'sales_head'

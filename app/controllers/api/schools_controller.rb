@@ -1,11 +1,11 @@
 class Api::SchoolsController < ApplicationController
   before_action :set_school, only: %i[show edit update destroy contacts update_contacts]
   before_action :authorize_user, except: [:show, :active_schools]
-  before_action -> { authorize_role('admin', 'sales_executive', 'sales_head') }, only: [:index]
+  before_action -> { authorize_role('admin', 'sales_executive', 'sales_head', 'vp_sales') }, only: [:index]
 
   # GET /schools
   def index
-    if current_user.role == 'admin'
+    if current_user.role == 'admin' || current_user.role == 'vp_sales'
       schools = School.includes(:group_school).all
     elsif current_user.role == 'sales_head'
       reporting_users = User.where(reporting_manager_id: current_user.id).pluck(:id)

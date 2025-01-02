@@ -7,7 +7,7 @@ module Api
 
     # GET /daily_statuses
     def index
-      @daily_statuses = if current_user.role == 'admin'
+      @daily_statuses = if current_user.role == 'admin' || current_user.role == 'vp_sales'
                           # Admin can view all daily statuses
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product).all
                         elsif current_user.role == 'sales_head'

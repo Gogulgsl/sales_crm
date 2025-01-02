@@ -10,7 +10,7 @@ class User < ApplicationRecord
   # Validations
   validates :username, presence: true, uniqueness: true, length: { maximum: 50 }
   validates :password, presence: true, length: { minimum: 6 }, if: :password_required?
-  validates :role, presence: true, inclusion: { in: %w[admin sales_head sales_executive ] }
+  validates :role, presence: true, inclusion: { in: %w[admin sales_head sales_executive vp_sales] }
   validates :email, presence: true, uniqueness: true
 
   private
