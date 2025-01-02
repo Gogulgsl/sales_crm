@@ -4,17 +4,16 @@ module Api
 
     # GET /contacts
     def index
-      @contacts = Contact.all
-      render json: @contacts
+      # Eager load the associated school with each contact
+      @contacts = Contact.includes(:school).all
+
+      # Render contacts with school details included
+      render json: @contacts.as_json(include: { school: { only: [:id, :name] } })
     end
 
     # GET /contacts/:id
     def show
-    end
-
-    # GET /contacts/new
-    def new
-      @contact = Contact.new
+      render json: @contact.as_json(include: { school: { only: [:id, :name] } })
     end
 
     # POST /contacts
@@ -26,43 +25,37 @@ module Api
         render json: { error: "A contact with this mobile number already exists." }, status: :unprocessable_entity
       else
         @contact = Contact.new(contact_params)
-
         @contact.createdby_user_id = current_user&.id
 
         if @contact.save
-          render json: @contact, status: :created
+          render json: @contact.as_json(include: { school: { only: [:id, :name] } }), status: :created
         else
           render json: @contact.errors, status: :unprocessable_entity
         end
       end
     end
 
-
-
+    # GET /contacts/active_contacts
     def active_contacts
-      contacts = Contact.where(is_active: true)
-      render json: contacts
-    end
-
-    # GET /contacts/:id/edit
-    def edit
+      contacts = Contact.includes(:school).where(is_active: true)
+      render json: contacts.as_json(include: { school: { only: [:id, :name] } })
     end
 
     # PATCH/PUT /contacts/:id
     def update
-      @contact.updatedby_user_id = current_user.id # Assuming you have `current_user`
+      @contact.updatedby_user_id = current_user.id
 
       if @contact.update(contact_params)
-        redirect_to @contact, notice: 'Contact was successfully updated.'
+        render json: @contact.as_json(include: { school: { only: [:id, :name] } }), status: :ok
       else
-        render :edit, status: :unprocessable_entity
+        render json: @contact.errors, status: :unprocessable_entity
       end
     end
 
     # DELETE /contacts/:id
     def destroy
       @contact.destroy
-      redirect_to contacts_url, notice: 'Contact was successfully deleted.'
+      head :no_content
     end
 
     private
@@ -72,7 +65,7 @@ module Api
     end
 
     def contact_params
-      params.require(:contact).permit(:contact_name, :mobile, :decision_maker, :school_id, :designation)
+      params.require(:contact).permit(:contact_name, :mobile, :decision_maker, :school_id, :designation, :is_active)
     end
   end
 end
