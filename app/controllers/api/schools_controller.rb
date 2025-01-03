@@ -104,7 +104,7 @@ class Api::SchoolsController < ApplicationController
 
   # GET /schools/:id/contacts
   def contacts
-    contacts = @school.contacts.select(:id, :contact_name, :mobile, :decision_maker :designation)
+    contacts = @school.contacts.select(:id, :contact_name, :mobile, :decision_maker, :designation)
     if contacts.any?
       render json: contacts, status: :ok
     else
