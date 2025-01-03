@@ -29,7 +29,7 @@ module Api
           decision_maker_contact: { only: [:id, :contact_name, :mobile, :decision_maker, :designation] },
           person_met_contact: { only: [:id, :contact_name, :mobile, :decision_maker, :designation] },
           user: { only: [:id, :username] },
-          school: { only: [:id, :name] },
+          school: { only: [:id, :name, :email] },
           opportunity: {
             only: [:id, :opportunity_name],
             include: {
