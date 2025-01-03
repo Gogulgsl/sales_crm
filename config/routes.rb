@@ -27,8 +27,8 @@ Rails.application.routes.draw do
     resources :opportunities do
       collection do
         post :add_opportunities, to: 'opportunities#create'
-        get :my_opportunities
         get :active_opportunities
+        get :logs
       end
     end
     resources :auth, only: [] do
