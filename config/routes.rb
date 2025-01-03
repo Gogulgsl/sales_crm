@@ -18,6 +18,7 @@ Rails.application.routes.draw do
         post :upload
         get :active_schools
         get :head_quarters
+        post :import_csv
       end
       member do
         get :contacts

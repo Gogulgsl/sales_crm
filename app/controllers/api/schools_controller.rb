@@ -1,3 +1,5 @@
+require 'csv'
+
 class Api::SchoolsController < ApplicationController
   before_action :set_school, only: %i[show edit update destroy contacts update_contacts]
   before_action :authorize_user, except: [:show, :active_schools]
@@ -131,6 +133,51 @@ class Api::SchoolsController < ApplicationController
       render json: schools.map { |school| format_school_data(school) }, status: :ok
     else
       render json: { message: 'No active schools found' }, status: :not_found
+    end
+  end
+
+  def import_csv
+    if params[:file].blank?
+      render json: { error: 'No file provided' }, status: :unprocessable_entity
+      return
+    end
+
+    file = params[:file]
+    unless file.content_type == 'text/csv'
+      render json: { error: 'Invalid file format. Please upload a CSV file.' }, status: :unprocessable_entity
+      return
+    end
+
+    begin
+      ActiveRecord::Base.transaction do
+        imported_schools = []
+
+        CSV.foreach(file.path, headers: true) do |row|
+          school_data = row.to_h.symbolize_keys
+
+          group_school = nil
+          if school_data[:part_of_group_school] && school_data[:group_school_id]
+            group_school = School.find_by(id: school_data[:group_school_id])
+            unless group_school
+              raise ActiveRecord::Rollback, "Group school with ID #{school_data[:group_school_id]} not found"
+            end
+          end
+
+          school = School.find_or_initialize_by(name: school_data[:name], email: school_data[:email])
+          school.assign_attributes(school_data.merge(group_school_id: group_school&.id))
+          school.createdby_user_id = current_user.id
+          school.updatedby_user_id = current_user.id
+          school.save!
+
+          imported_schools << school
+        end
+
+        render json: { message: 'Schools imported successfully'}, status: :ok
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { error: "Error importing schools: #{e.message}" }, status: :unprocessable_entity
+    rescue StandardError => e
+      render json: { error: "An error occurred: #{e.message}" }, status: :internal_server_error
     end
   end
 
