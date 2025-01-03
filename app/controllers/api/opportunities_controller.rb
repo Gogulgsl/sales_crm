@@ -70,7 +70,7 @@ class Api::OpportunitiesController < ApplicationController
   end
 
   def logs
-    logs = OpportunityLog.includes(:opportunity, :school, :product, :user, :contact).order(created_at: :desc)
+    logs = OpportunityLog.includes(:opportunity, opportunity: [:school, :product, :user, :contact]).order(created_at: :desc)
 
     render json: logs.as_json(
       include: {
@@ -82,16 +82,12 @@ class Api::OpportunitiesController < ApplicationController
             contact: { only: [:id, :contact_name, :mobile, :designation] }
           },
           except: [:created_at, :updated_at]
-        },
-        school: { only: [:id, :name] },
-        product: { only: [:id, :product_name] },
-        user: { only: [:id, :username] },
-        contact: { only: [:id, :contact_name, :mobile, :designation] }
+        }
       },
       except: [:updated_at]
     ), status: :ok
   end
-  
+
   private
 
   # Fetch opportunity by ID
