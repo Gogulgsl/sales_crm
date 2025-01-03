@@ -155,6 +155,7 @@ class Api::SchoolsController < ApplicationController
         CSV.foreach(file.path, headers: true) do |row|
           school_data = row.to_h.symbolize_keys
 
+          # Find the group school if provided
           group_school = nil
           if school_data[:part_of_group_school] && school_data[:group_school_id]
             group_school = School.find_by(id: school_data[:group_school_id])
@@ -163,19 +164,40 @@ class Api::SchoolsController < ApplicationController
             end
           end
 
+          # Create or update the school record
           school = School.find_or_initialize_by(name: school_data[:name], email: school_data[:email])
-          school.assign_attributes(school_data.merge(group_school_id: group_school&.id))
+          school.assign_attributes(school_data.except(:contacts).merge(group_school_id: group_school&.id))
           school.createdby_user_id = current_user.id
           school.updatedby_user_id = current_user.id
           school.save!
 
+          # Parse and create/update contacts
+          if school_data[:contacts].present?
+            begin
+              contacts = JSON.parse(school_data[:contacts], symbolize_names: true)
+              contacts.each do |contact_data|
+                contact = school.contacts.find_or_initialize_by(
+                  mobile: contact_data[:mobile] 
+                )
+                contact.assign_attributes(contact_data.merge(
+                  school_id: school.id,
+                  createdby_user_id: current_user.id,
+                  updatedby_user_id: current_user.id
+                ))
+                contact.save!
+              end
+            rescue JSON::ParserError => e
+              raise ActiveRecord::Rollback, "Invalid JSON format in contacts: #{e.message}"
+            end
+          end
+
           imported_schools << school
         end
 
-        render json: { message: 'Schools imported successfully'}, status: :ok
+        render json: { message: 'Schools and contacts imported successfully' }, status: :ok
       end
     rescue ActiveRecord::RecordInvalid => e
-      render json: { error: "Error importing schools: #{e.message}" }, status: :unprocessable_entity
+      render json: { error: "Error importing data: #{e.message}" }, status: :unprocessable_entity
     rescue StandardError => e
       render json: { error: "An error occurred: #{e.message}" }, status: :internal_server_error
     end
