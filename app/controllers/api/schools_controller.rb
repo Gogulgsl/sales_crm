@@ -1,4 +1,5 @@
 require 'csv'
+require 'roo'
 
 class Api::SchoolsController < ApplicationController
   before_action :set_school, only: %i[show edit update destroy contacts update_contacts]
@@ -136,66 +137,44 @@ class Api::SchoolsController < ApplicationController
     end
   end
 
-  def import_csv
+  def import_file
     if params[:file].blank?
       render json: { error: 'No file provided' }, status: :unprocessable_entity
       return
     end
 
     file = params[:file]
-    unless file.content_type == 'text/csv'
-      render json: { error: 'Invalid file format. Please upload a CSV file.' }, status: :unprocessable_entity
+    if !['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].include?(file.content_type)
+      render json: { error: 'Invalid file format. Please upload a CSV or XLSX file.' }, status: :unprocessable_entity
       return
     end
 
+    imported_schools = []
+
     begin
       ActiveRecord::Base.transaction do
-        imported_schools = []
-
-        CSV.foreach(file.path, headers: true) do |row|
-          school_data = row.to_h.symbolize_keys
-
-          # Find the group school if provided
-          group_school = nil
-          if school_data[:part_of_group_school] && school_data[:group_school_id]
-            group_school = School.find_by(id: school_data[:group_school_id])
-            unless group_school
-              raise ActiveRecord::Rollback, "Group school with ID #{school_data[:group_school_id]} not found"
-            end
+        if file.content_type == 'text/csv'
+          # Handle CSV files
+          CSV.foreach(file.path, headers: true) do |row|
+            process_school_data(row.to_h, imported_schools)
           end
+        elsif file.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          # Handle XLSX files using Roo
+          spreadsheet = Roo::Spreadsheet.open(file.path)
+          headers = spreadsheet.row(1) # Get the header row
 
-          # Create or update the school record
-          school = School.find_or_initialize_by(name: school_data[:name], email: school_data[:email])
-          school.assign_attributes(school_data.except(:contacts).merge(group_school_id: group_school&.id))
-          school.createdby_user_id = current_user.id
-          school.updatedby_user_id = current_user.id
-          school.save!
+          spreadsheet.each_with_index do |row, index|
+            next if index == 0 # Skip the header row
 
-          # Parse and create/update contacts
-          if school_data[:contacts].present?
-            begin
-              contacts = JSON.parse(school_data[:contacts], symbolize_names: true)
-              contacts.each do |contact_data|
-                contact = school.contacts.find_or_initialize_by(
-                  mobile: contact_data[:mobile] 
-                )
-                contact.assign_attributes(contact_data.merge(
-                  school_id: school.id,
-                  createdby_user_id: current_user.id,
-                  updatedby_user_id: current_user.id
-                ))
-                contact.save!
-              end
-            rescue JSON::ParserError => e
-              raise ActiveRecord::Rollback, "Invalid JSON format in contacts: #{e.message}"
-            end
+            # Convert row to a hash using the headers
+            school_data = headers.zip(row).to_h
+
+            process_school_data(school_data, imported_schools)
           end
-
-          imported_schools << school
         end
-
-        render json: { message: 'Schools and contacts imported successfully' }, status: :ok
       end
+
+      render json: { message: 'Schools and contacts imported successfully' }, status: :ok
     rescue ActiveRecord::RecordInvalid => e
       render json: { error: "Error importing data: #{e.message}" }, status: :unprocessable_entity
     rescue StandardError => e
@@ -204,6 +183,46 @@ class Api::SchoolsController < ApplicationController
   end
 
   private
+
+  # Modify the process_school_data method to accept imported_schools as an argument
+  def process_school_data(school_data, imported_schools)
+    school_data.symbolize_keys!
+
+    # Find the group school if provided
+    group_school = nil
+    if school_data[:part_of_group_school] && school_data[:group_school_id]
+      group_school = School.find_by(id: school_data[:group_school_id])
+      raise ActiveRecord::Rollback, "Group school with ID #{school_data[:group_school_id]} not found" unless group_school
+    end
+
+    # Create or update the school record
+    school = School.find_or_initialize_by(name: school_data[:name], email: school_data[:email])
+    school.assign_attributes(school_data.except(:contacts).merge(group_school_id: group_school&.id))
+    school.createdby_user_id = current_user.id
+    school.updatedby_user_id = current_user.id
+    school.save!
+
+    # Parse and create/update contacts if present
+    if school_data[:contacts].present?
+      begin
+        contacts = JSON.parse(school_data[:contacts], symbolize_names: true)
+        contacts.each do |contact_data|
+          contact = school.contacts.find_or_initialize_by(mobile: contact_data[:mobile])
+          contact.assign_attributes(contact_data.merge(
+            school_id: school.id,
+            createdby_user_id: current_user.id,
+            updatedby_user_id: current_user.id
+          ))
+          contact.save!
+        end
+      rescue JSON::ParserError => e
+        raise ActiveRecord::Rollback, "Invalid JSON format in contacts: #{e.message}"
+      end
+    end
+    imported_schools << school
+  end
+
+  
 
   def set_school
     @school = School.find_by(id: params[:id])
