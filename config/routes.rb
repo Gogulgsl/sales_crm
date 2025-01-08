@@ -30,6 +30,7 @@ Rails.application.routes.draw do
         post :add_opportunities, to: 'opportunities#create'
         get :active_opportunities
         get :logs
+        post :import_file
       end
     end
     resources :auth, only: [] do
