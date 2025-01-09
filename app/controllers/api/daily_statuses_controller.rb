@@ -137,9 +137,27 @@ module Api
     def process_dsr_data(data, imported_dsr_records)
       data.symbolize_keys!
 
-      # Convert Date fields to String if present
-      data[:created_at] = data[:created_at].to_s if data[:created_at].is_a?(Date)
-      data[:updated_at] = data[:updated_at].to_s if data[:updated_at].is_a?(Date)
+      # Ensure 'created_at' and 'updated_at' are in the correct format
+      if data[:created_at].present?
+        begin
+          # Convert to DateTime if necessary (ensure correct format for PostgreSQL)
+          data[:created_at] = DateTime.parse(data[:created_at].to_s) 
+        rescue ArgumentError => e
+          raise ActiveRecord::Rollback, "Invalid 'created_at' format for row with ID #{data[:id]}: #{e.message}"
+        end
+      end
+
+      if data[:updated_at].present?
+        begin
+          # Convert to DateTime if necessary (ensure correct format for PostgreSQL)
+          data[:updated_at] = DateTime.parse(data[:updated_at].to_s)
+        rescue ArgumentError => e
+          raise ActiveRecord::Rollback, "Invalid 'updated_at' format for row with ID #{data[:id]}: #{e.message}"
+        end
+      else
+        # Optionally, you can set 'updated_at' to the same value as 'created_at' if not provided
+        data[:updated_at] = data[:created_at] || DateTime.now
+      end
 
       # Validate mandatory fields
       user = User.find_by(id: data[:user_id]) || raise(ActiveRecord::Rollback, "User with ID #{data[:user_id]} not found")
@@ -153,6 +171,7 @@ module Api
         user_id: data[:user_id],
         opportunity_id: data[:opportunity_id]
       )
+      
       daily_status.assign_attributes(
         follow_up: data[:follow_up],
         designation: data[:designation],
@@ -167,16 +186,19 @@ module Api
         createdby_user_id: data[:createdby_user_id], # Use value from Excel
         updatedby_user_id: data[:updatedby_user_id]  # Use value from Excel
       )
-      DailyStatus.record_timestamps = false
+      
+      # Save the record
       daily_status.save!
+
+      # Update created_at and updated_at manually after saving the record
       daily_status.update_columns(
-        created_at: data[:created_at],  # Use the value from the file or fallback to current timestamp
-        updated_at: data[:updated_at]   # Use the value from the file or fallback to created_at
+        created_at: data[:created_at],  # Use value from Excel
+        updated_at: data[:updated_at]   # Use value from Excel
       )
-      DailyStatus.record_timestamps = true
+
       imported_dsr_records << daily_status
     end
-  
+
     def set_daily_status
       @daily_status = DailyStatus.find(params[:id])
     rescue ActiveRecord::RecordNotFound
