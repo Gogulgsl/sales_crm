@@ -117,7 +117,6 @@ module Api
 
             spreadsheet.each_with_index do |row, index|
               next if index == 0 # Skip the header row
-              row = row.map { |cell| cell.is_a?(Date) ? cell.to_s : cell } # Convert Date to String
               dsr_data = headers.zip(row).to_h
               process_dsr_data(dsr_data, imported_dsr_records)
             end
@@ -132,17 +131,17 @@ module Api
       end
     end
 
-
     private
 
     def process_dsr_data(data, imported_dsr_records)
       data.symbolize_keys!
 
-      # Manually set the created_at and updated_at fields using the values from the file
-      data[:created_at] = data[:created_at].to_s if data[:created_at].is_a?(Date)
-      data[:updated_at] = data[:updated_at].to_s if data[:updated_at].is_a?(Date)
-
       # Validate mandatory fields
+      required_fields = %i[user_id opportunity_id createdby_user_id updatedby_user_id]
+      required_fields.each do |field|
+        raise ActiveRecord::Rollback, "Missing required field: #{field}" if data[field].blank?
+      end
+
       user = User.find_by(id: data[:user_id]) || raise(ActiveRecord::Rollback, "User with ID #{data[:user_id]} not found")
       opportunity = Opportunity.find_by(id: data[:opportunity_id]) || raise(ActiveRecord::Rollback, "Opportunity with ID #{data[:opportunity_id]} not found")
       school = School.find_by(id: data[:school_id]) if data[:school_id].present?
@@ -150,10 +149,7 @@ module Api
       person_met = Contact.find_by(id: data[:person_met_contact_id]) if data[:person_met_contact_id].present?
 
       # Create or update the daily status
-      daily_status = DailyStatus.find_or_initialize_by(
-        user_id: data[:user_id],
-        opportunity_id: data[:opportunity_id]
-      )
+      daily_status = DailyStatus.find_or_initialize_by(user_id: data[:user_id], opportunity_id: data[:opportunity_id])
       daily_status.assign_attributes(
         follow_up: data[:follow_up],
         designation: data[:designation],
@@ -165,25 +161,16 @@ module Api
         decision_maker_contact_id: decision_maker&.id,
         person_met_contact_id: person_met&.id,
         status: data[:status] || 'pending',
-        createdby_user_id: data[:createdby_user_id], # From Excel file
-        updatedby_user_id: data[:updatedby_user_id]  # From Excel file
+        created_at: data[:created_at].present? ? DateTime.parse(data[:created_at]) : Time.current,
+        updated_at: data[:updated_at].present? ? DateTime.parse(data[:updated_at]) : Time.current,
+        createdby_user_id: data[:createdby_user_id], # Use provided value
+        updatedby_user_id: data[:updatedby_user_id] # Use provided value
       )
-
-      # Temporarily disable Rails' timestamp management
-      DailyStatus.record_timestamps = false
-
-      # Save the record and update the timestamps manually from the data
       daily_status.save!
-      daily_status.update_columns(
-        created_at: data[:created_at].presence || daily_status.created_at,
-        updated_at: data[:updated_at].presence || daily_status.updated_at
-      )
-
-      # Re-enable Rails' timestamp management
-      DailyStatus.record_timestamps = true
-
       imported_dsr_records << daily_status
     end
+
+
 
 
     def set_daily_status
