@@ -138,7 +138,7 @@ module Api
     def process_dsr_data(data, imported_dsr_records)
       data.symbolize_keys!
 
-      # Convert Date fields to String if present
+      # Manually set the created_at and updated_at fields using the values from the file
       data[:created_at] = data[:created_at].to_s if data[:created_at].is_a?(Date)
       data[:updated_at] = data[:updated_at].to_s if data[:updated_at].is_a?(Date)
 
@@ -165,12 +165,26 @@ module Api
         decision_maker_contact_id: decision_maker&.id,
         person_met_contact_id: person_met&.id,
         status: data[:status] || 'pending',
-        createdby_user_id: data[:createdby_user_id], # Use value from Excel
-        updatedby_user_id: data[:updatedby_user_id]  # Use value from Excel
+        createdby_user_id: data[:createdby_user_id], # From Excel file
+        updatedby_user_id: data[:updatedby_user_id]  # From Excel file
       )
+
+      # Temporarily disable Rails' timestamp management
+      DailyStatus.record_timestamps = false
+
+      # Save the record and update the timestamps manually from the data
       daily_status.save!
+      daily_status.update_columns(
+        created_at: data[:created_at].presence || daily_status.created_at,
+        updated_at: data[:updated_at].presence || daily_status.updated_at
+      )
+
+      # Re-enable Rails' timestamp management
+      DailyStatus.record_timestamps = true
+
       imported_dsr_records << daily_status
     end
+
 
     def set_daily_status
       @daily_status = DailyStatus.find(params[:id])
