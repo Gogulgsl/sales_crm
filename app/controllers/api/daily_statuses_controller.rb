@@ -89,7 +89,7 @@ module Api
       render json: { message: 'Daily status was successfully deleted.' }, status: :ok
     end
 
-   def import_file
+    def import_file
       if params[:file].blank?
         render json: { error: 'No file provided' }, status: :unprocessable_entity
         return
@@ -106,15 +106,18 @@ module Api
       begin
         ActiveRecord::Base.transaction do
           if file.content_type == 'text/csv'
+            # Handle CSV files
             CSV.foreach(file.path, headers: true) do |row|
               process_dsr_data(row.to_h, imported_dsr_records)
             end
-          else
+          elsif file.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            # Handle XLSX files using Roo
             spreadsheet = Roo::Spreadsheet.open(file.path)
-            headers = spreadsheet.row(1)
+            headers = spreadsheet.row(1) # Get the header row
 
             spreadsheet.each_with_index do |row, index|
-              next if index.zero?
+              next if index == 0 # Skip the header row
+              row = row.map { |cell| cell.is_a?(Date) ? cell.to_s : cell } # Convert Date to String
               dsr_data = headers.zip(row).to_h
               process_dsr_data(dsr_data, imported_dsr_records)
             end
@@ -135,12 +138,11 @@ module Api
     def process_dsr_data(data, imported_dsr_records)
       data.symbolize_keys!
 
-      # Validate mandatory fields
-      required_fields = %i[user_id opportunity_id createdby_user_id updatedby_user_id]
-      required_fields.each do |field|
-        raise ActiveRecord::Rollback, "Missing required field: #{field}" if data[field].blank?
-      end
+      # Convert Date fields to String if present
+      data[:created_at] = data[:created_at].to_s if data[:created_at].is_a?(Date)
+      data[:updated_at] = data[:updated_at].to_s if data[:updated_at].is_a?(Date)
 
+      # Validate mandatory fields
       user = User.find_by(id: data[:user_id]) || raise(ActiveRecord::Rollback, "User with ID #{data[:user_id]} not found")
       opportunity = Opportunity.find_by(id: data[:opportunity_id]) || raise(ActiveRecord::Rollback, "Opportunity with ID #{data[:opportunity_id]} not found")
       school = School.find_by(id: data[:school_id]) if data[:school_id].present?
@@ -148,7 +150,10 @@ module Api
       person_met = Contact.find_by(id: data[:person_met_contact_id]) if data[:person_met_contact_id].present?
 
       # Create or update the daily status
-      daily_status = DailyStatus.find_or_initialize_by(user_id: data[:user_id], opportunity_id: data[:opportunity_id])
+      daily_status = DailyStatus.find_or_initialize_by(
+        user_id: data[:user_id],
+        opportunity_id: data[:opportunity_id]
+      )
       daily_status.assign_attributes(
         follow_up: data[:follow_up],
         designation: data[:designation],
@@ -160,15 +165,12 @@ module Api
         decision_maker_contact_id: decision_maker&.id,
         person_met_contact_id: person_met&.id,
         status: data[:status] || 'pending',
-        created_at: data[:created_at].present? ? DateTime.parse(data[:created_at]) : Time.current,
-        updated_at: data[:updated_at].present? ? DateTime.parse(data[:updated_at]) : Time.current,
-        createdby_user_id: data[:createdby_user_id], # Use provided value
-        updatedby_user_id: data[:updatedby_user_id] # Use provided value
+        createdby_user_id: data[:createdby_user_id], # Use value from Excel
+        updatedby_user_id: data[:updatedby_user_id]  # Use value from Excel
       )
       daily_status.save!
       imported_dsr_records << daily_status
     end
-
 
     def set_daily_status
       @daily_status = DailyStatus.find(params[:id])
