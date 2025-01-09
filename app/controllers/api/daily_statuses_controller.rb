@@ -86,7 +86,83 @@ module Api
       render json: { message: 'Daily status was successfully deleted.' }, status: :ok
     end
 
+    def import_file
+      if params[:file].blank?
+        render json: { error: 'No file provided' }, status: :unprocessable_entity
+        return
+      end
+
+      file = params[:file]
+      unless ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].include?(file.content_type)
+        render json: { error: 'Invalid file format. Please upload a CSV or XLSX file.' }, status: :unprocessable_entity
+        return
+      end
+
+      imported_dsr_records = []
+
+      begin
+        ActiveRecord::Base.transaction do
+          if file.content_type == 'text/csv'
+            # Handle CSV files
+            CSV.foreach(file.path, headers: true) do |row|
+              process_dsr_data(row.to_h, imported_dsr_records)
+            end
+          elsif file.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            # Handle XLSX files using Roo
+            spreadsheet = Roo::Spreadsheet.open(file.path)
+            headers = spreadsheet.row(1) # Get the header row
+
+            spreadsheet.each_with_index do |row, index|
+              next if index == 0 # Skip the header row
+              dsr_data = headers.zip(row).to_h
+              process_dsr_data(dsr_data, imported_dsr_records)
+            end
+          end
+        end
+
+        render json: { message: 'Daily statuses imported successfully', records: imported_dsr_records }, status: :ok
+      rescue ActiveRecord::RecordInvalid => e
+        render json: { error: "Error importing data: #{e.message}" }, status: :unprocessable_entity
+      rescue StandardError => e
+        render json: { error: "An error occurred: #{e.message}" }, status: :internal_server_error
+      end
+    end
+
+
     private
+
+    def process_dsr_data(data, imported_dsr_records)
+      data.symbolize_keys!
+
+      # Validate mandatory fields
+      user = User.find_by(id: data[:user_id]) || raise(ActiveRecord::Rollback, "User with ID #{data[:user_id]} not found")
+      opportunity = Opportunity.find_by(id: data[:opportunity_id]) || raise(ActiveRecord::Rollback, "Opportunity with ID #{data[:opportunity_id]} not found")
+      school = School.find_by(id: data[:school_id]) if data[:school_id].present?
+      decision_maker = Contact.find_by(id: data[:decision_maker_contact_id]) if data[:decision_maker_contact_id].present?
+      person_met = Contact.find_by(id: data[:person_met_contact_id]) if data[:person_met_contact_id].present?
+
+      # Create or update the daily status
+      daily_status = DailyStatus.find_or_initialize_by(
+        user_id: data[:user_id],
+        opportunity_id: data[:opportunity_id]
+      )
+      daily_status.assign_attributes(
+        follow_up: data[:follow_up],
+        designation: data[:designation],
+        email: data[:email],
+        discussion_point: data[:discussion_point],
+        next_steps: data[:next_steps],
+        stage: data[:stage],
+        school_id: school&.id,
+        decision_maker_contact_id: decision_maker&.id,
+        person_met_contact_id: person_met&.id,
+        status: data[:status] || 'pending',
+        createdby_user_id: current_user.id,
+        updatedby_user_id: current_user.id
+      )
+      daily_status.save!
+      imported_dsr_records << daily_status
+    end
 
     # Use callbacks to share common setup or constraints between actions.
     def set_daily_status

@@ -9,5 +9,5 @@ class DailyStatus < ApplicationRecord
 
   # Validations
   validates :user_id, :opportunity_id, presence: true
-  validates :follow_up, :discussion_point, :next_steps, :stage, presence: true
+  # validates :follow_up, :discussion_point, :next_steps, :stage, presence: true
 end

@@ -38,7 +38,11 @@ Rails.application.routes.draw do
         post :login
       end
     end    
-    resources :daily_statuses
+    resources :daily_statuses do 
+      collection do 
+        post :import_file
+      end
+    end
     resources :contacts do 
       collection do 
         get :active_contacts
