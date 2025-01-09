@@ -167,7 +167,13 @@ module Api
         createdby_user_id: data[:createdby_user_id], # Use value from Excel
         updatedby_user_id: data[:updatedby_user_id]  # Use value from Excel
       )
+      DailyStatus.record_timestamps = false
       daily_status.save!
+      daily_status.update_columns(
+        created_at: data[:created_at],  # Use the value from the file or fallback to current timestamp
+        updated_at: data[:updated_at]   # Use the value from the file or fallback to created_at
+      )
+      DailyStatus.record_timestamps = true
       imported_dsr_records << daily_status
     end
   
