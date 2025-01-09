@@ -1,3 +1,6 @@
+require 'csv'
+require 'roo'
+
 module Api
   class DailyStatusesController < ApplicationController
    
@@ -86,7 +89,7 @@ module Api
       render json: { message: 'Daily status was successfully deleted.' }, status: :ok
     end
 
-    def import_file
+   def import_file
       if params[:file].blank?
         render json: { error: 'No file provided' }, status: :unprocessable_entity
         return
@@ -103,17 +106,15 @@ module Api
       begin
         ActiveRecord::Base.transaction do
           if file.content_type == 'text/csv'
-            # Handle CSV files
             CSV.foreach(file.path, headers: true) do |row|
               process_dsr_data(row.to_h, imported_dsr_records)
             end
-          elsif file.content_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            # Handle XLSX files using Roo
+          else
             spreadsheet = Roo::Spreadsheet.open(file.path)
-            headers = spreadsheet.row(1) # Get the header row
+            headers = spreadsheet.row(1)
 
             spreadsheet.each_with_index do |row, index|
-              next if index == 0 # Skip the header row
+              next if index.zero?
               dsr_data = headers.zip(row).to_h
               process_dsr_data(dsr_data, imported_dsr_records)
             end
@@ -135,6 +136,11 @@ module Api
       data.symbolize_keys!
 
       # Validate mandatory fields
+      required_fields = %i[user_id opportunity_id createdby_user_id updatedby_user_id]
+      required_fields.each do |field|
+        raise ActiveRecord::Rollback, "Missing required field: #{field}" if data[field].blank?
+      end
+
       user = User.find_by(id: data[:user_id]) || raise(ActiveRecord::Rollback, "User with ID #{data[:user_id]} not found")
       opportunity = Opportunity.find_by(id: data[:opportunity_id]) || raise(ActiveRecord::Rollback, "Opportunity with ID #{data[:opportunity_id]} not found")
       school = School.find_by(id: data[:school_id]) if data[:school_id].present?
@@ -142,10 +148,7 @@ module Api
       person_met = Contact.find_by(id: data[:person_met_contact_id]) if data[:person_met_contact_id].present?
 
       # Create or update the daily status
-      daily_status = DailyStatus.find_or_initialize_by(
-        user_id: data[:user_id],
-        opportunity_id: data[:opportunity_id]
-      )
+      daily_status = DailyStatus.find_or_initialize_by(user_id: data[:user_id], opportunity_id: data[:opportunity_id])
       daily_status.assign_attributes(
         follow_up: data[:follow_up],
         designation: data[:designation],
@@ -157,14 +160,16 @@ module Api
         decision_maker_contact_id: decision_maker&.id,
         person_met_contact_id: person_met&.id,
         status: data[:status] || 'pending',
-        createdby_user_id: current_user.id,
-        updatedby_user_id: current_user.id
+        created_at: data[:created_at].present? ? DateTime.parse(data[:created_at]) : Time.current,
+        updated_at: data[:updated_at].present? ? DateTime.parse(data[:updated_at]) : Time.current,
+        createdby_user_id: data[:createdby_user_id], # Use provided value
+        updatedby_user_id: data[:updatedby_user_id] # Use provided value
       )
       daily_status.save!
       imported_dsr_records << daily_status
     end
 
-    # Use callbacks to share common setup or constraints between actions.
+
     def set_daily_status
       @daily_status = DailyStatus.find(params[:id])
     rescue ActiveRecord::RecordNotFound
