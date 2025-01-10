@@ -167,7 +167,14 @@ module Api
       person_met = Contact.find_by(id: data[:person_met_contact_id]) if data[:person_met_contact_id].present?
 
       # Create or update the daily status
-      daily_status = DailyStatus.find_or_initialize_by(
+      daily_status = DailyStatus.find_by(
+        user_id: data[:user_id],
+        opportunity_id: data[:opportunity_id],
+        created_at: data[:created_at]
+      )
+
+      # Create a new record if no matching record exists
+      daily_status ||= DailyStatus.new(
         user_id: data[:user_id],
         opportunity_id: data[:opportunity_id]
       )
