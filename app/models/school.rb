@@ -7,9 +7,9 @@ class School < ApplicationRecord
   accepts_nested_attributes_for :contacts, allow_destroy: true
   # Validations
   validates :name, presence: true
-  validates :location, presence: true
-  validates :city, presence: true
-  validates :state, presence: true
+  # validates :location, presence: true
+  # validates :city, presence: true
+  # validates :state, presence: true
   # validates :pincode, presence: true, format: { with: /\A\d{5,6}\z/, message: 'must be a valid pincode' }
   # validates :number_of_students, numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   # validates :avg_fees, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
