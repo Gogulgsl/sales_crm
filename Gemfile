@@ -46,3 +46,5 @@ gem 'jwt'
 gem 'rack-cors'
 
 gem 'roo'
+
+gem 'kaminari'
