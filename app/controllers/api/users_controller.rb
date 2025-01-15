@@ -18,12 +18,15 @@ class Api::UsersController < ApplicationController
 # end
 
   def index
+    unless current_user
+      render json: { error: 'User not logged in' }, status: :unauthorized
+      return
+    end
+
     case current_user.role
     when 'admin'
-      # Admin sees all users
       @users = User.includes(:manager_user, :sales_team)
     when 'sales_head'
-      # Sales Head sees users reporting to them
       @users = User.includes(:manager_user, :sales_team).where(reporting_manager_id: current_user.id)
     else
       render json: { error: 'Unauthorized access' }, status: :forbidden
