@@ -3,21 +3,9 @@ class Api::SalesTeamsController < ApplicationController
 
   # GET /api/sales_teams
   def index
-    case current_user.role
-    when 'admin'
-      # Admin sees all data
-      @sales_teams = SalesTeam.includes(:user, :manager_user)
-    when 'sales_head'
-      # Sales Head sees their sales executives
-      @sales_teams = SalesTeam.includes(:user, :manager_user).where(manager_user_id: current_user.id)
-    else
-      render json: { error: 'Unauthorized access' }, status: :forbidden
-      return
-    end
-
-    render json: @sales_teams, include: ['user', 'manager_user']
+    @sales_teams = SalesTeam.all
+    render json: @sales_teams, include: ['sales_team', 'manager']
   end
-
 
   # GET /api/sales_teams/:id
   def show

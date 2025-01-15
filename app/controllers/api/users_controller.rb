@@ -1,21 +1,37 @@
 class Api::UsersController < ApplicationController
- def index
-  users = User.includes(:manager_user).all
+#  def index
+#   users = User.includes(:manager_user).all
 
-  users_data = users.map do |user|
-    user_data = user.as_json
+#   users_data = users.map do |user|
+#     user_data = user.as_json
 
-    # Check if the user has a reporting manager
-    if user.reporting_manager_id.present?
-      # Include reporting manager's ID and name in the user response
-      reporting_manager = User.find_by(id: user.reporting_manager_id)
-      user_data[:reporting_manager] = { id: reporting_manager&.id, name: reporting_manager&.username, role: reporting_manager.role}
+#     # Check if the user has a reporting manager
+#     if user.reporting_manager_id.present?
+#       # Include reporting manager's ID and name in the user response
+#       reporting_manager = User.find_by(id: user.reporting_manager_id)
+#       user_data[:reporting_manager] = { id: reporting_manager&.id, name: reporting_manager&.username, role: reporting_manager.role}
+#     end
+#     user_data
+#   end
+
+#   render json: users_data
+# end
+
+  def index
+    case current_user.role
+    when 'admin'
+      # Admin sees all users
+      @users = User.includes(:manager_user, :sales_team)
+    when 'sales_head'
+      # Sales Head sees users reporting to them
+      @users = User.includes(:manager_user, :sales_team).where(reporting_manager_id: current_user.id)
+    else
+      render json: { error: 'Unauthorized access' }, status: :forbidden
+      return
     end
-    user_data
-  end
 
-  render json: users_data
-end
+    render json: @users, include: [:manager_user, :sales_team]
+  end
 
   def show
     user = User.find(params[:id])
