@@ -10,17 +10,14 @@ module Api
     # GET /daily_statuses
     def index
       @daily_statuses = if current_user.role.in?(%w[admin vp_sales])
-                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
-                                     .page(params[:page]).per(20) # Add pagination
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product).all
                         elsif current_user.role == 'sales_head'
                           reporting_users = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
                                      .where(user_id: [current_user.id] + reporting_users)
-                                     .page(params[:page]).per(20) # Add pagination
                         elsif current_user.role == 'sales_executive'
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
                                      .where(user_id: current_user.id)
-                                     .page(params[:page]).per(20) # Add pagination
                         else
                           return render json: { error: 'Unauthorized access' }, status: :forbidden
                         end
