@@ -1,4 +1,6 @@
 class Api::UsersController < ApplicationController
+  before_action :authorize_user, only: [:index]
+
 #  def index
 #   users = User.includes(:manager_user).all
 
@@ -138,5 +140,9 @@ class Api::UsersController < ApplicationController
 
   def user_update_params
     params.require(:user).permit(:username, :role, :reporting_manager_id, :email, :mobile_number, :is_active) # Changed :email_id to :email
+  end
+
+  def authorize_user
+    render json: { error: 'Unauthorized' }, status: :unauthorized unless request.headers['Authorization'].present?
   end
 end
