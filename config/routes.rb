@@ -3,6 +3,7 @@ Rails.application.routes.draw do
     resources :users do
       collection do
         get :reporting_managers
+        get :active_users
         post :forgot_password
         post :reset_password
       end

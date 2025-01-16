@@ -131,6 +131,12 @@ class Api::UsersController < ApplicationController
     end
   end
 
+  def active_users
+    active_users = User.where(is_active: true)
+
+    render json: active_users.as_json(only: [:id, :username, :email, :mobile_number, :role, :created_at, :updated_at]), status: :ok
+  end
+
 
   private
 
