@@ -26,42 +26,8 @@ class Api::OpportunitiesController < ApplicationController
       return
     end
 
-    # Filter the response to include all required fields
-    filtered_opportunities = opportunities.map do |opportunity|
-      {
-        id: opportunity.id,
-        school_id: opportunity.school_id,
-        product_id: opportunity.product_id,
-        user_id: opportunity.user_id,
-        contact_id: opportunity.contact_id,
-        start_date: opportunity.start_date,
-        opportunity_name: opportunity.opportunity_name,
-        last_stage: opportunity.last_stage,
-        created_at: opportunity.created_at,
-        updated_at: opportunity.updated_at,
-        is_active: opportunity.is_active,
-        zone: opportunity.zone,
-        product: {
-          id: opportunity.product.id,
-          product_name: opportunity.product.product_name,
-          description: opportunity.product.description,
-          available_days: opportunity.product.available_days
-        },
-        school: {
-          id: opportunity.school.id,
-          name: opportunity.school.name
-        },
-        user: {
-          id: opportunity.user.id,
-          username: opportunity.user.username,
-          role: opportunity.user.role
-        }
-      }
-    end
-
-    render json: filtered_opportunities, status: :ok
+    render json: opportunities.as_json(include: [:product, :school, :user, :contact]), status: :ok
   end
-
 
   # GET /api/opportunities/:id
   def show
