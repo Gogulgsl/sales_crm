@@ -39,6 +39,11 @@ module Api
       )
     end
 
+    def pagination 
+      @daily_statuses = DailyStatus.page(params[:page]).per(5000)
+      render json: @daily_statuses
+    end
+
     # GET /daily_statuses/:id
     def show
       render json: @daily_status.as_json(

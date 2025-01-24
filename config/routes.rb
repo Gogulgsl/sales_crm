@@ -42,6 +42,7 @@ Rails.application.routes.draw do
     resources :daily_statuses do 
       collection do 
         post :import_file
+        get :pagination
       end
     end
     resources :contacts do 
