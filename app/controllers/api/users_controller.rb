@@ -26,7 +26,7 @@ class Api::UsersController < ApplicationController
     end
 
     case current_user.role
-    when 'admin'
+    when 'admin', 'vp_sales'
       @users = User.includes(:manager_user, :sales_team)
     when 'sales_head'
       @users = User.includes(:manager_user, :sales_team).where(reporting_manager_id: current_user.id)
