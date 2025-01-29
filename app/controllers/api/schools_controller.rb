@@ -29,15 +29,54 @@ class Api::SchoolsController < ApplicationController
   end
 
   # POST /schools
+  # def create
+  #   ActiveRecord::Base.transaction do
+  #     # Ensure the group school is handled when part_of_group_school is true
+  #     if params[:school][:part_of_group_school] && params[:school][:group_school_id].blank?
+  #       render json: { error: 'Group school must be provided if the school is part of a group' }, status: :unprocessable_entity
+  #       raise ActiveRecord::Rollback
+  #     end
+
+  #     # Find or create group school if part_of_group_school is true and group_school_id is provided
+  #     group_school = nil
+  #     if params[:school][:part_of_group_school]
+  #       group_school = School.find_by(id: params[:school][:group_school_id])
+  #       if group_school.nil?
+  #         render json: { error: 'Group school not found' }, status: :unprocessable_entity
+  #         raise ActiveRecord::Rollback
+  #       end
+  #     end
+
+  #     # Create the school with provided params, including group_school_id if applicable
+  #     @school = School.new(school_params.merge(group_school_id: group_school&.id))
+
+  #     if @school.save
+  #       # If contacts data is provided, create or update the contacts for the school
+  #       contacts = if params[:school][:contacts].present?
+  #                    create_or_update_contacts(params[:school][:contacts], @school.id)
+  #                  else
+  #                    []
+  #                  end
+
+  #       # Return school data along with contacts
+  #       render json: { school: format_school_data(@school), contacts: contacts }, status: :created
+  #     else
+  #       render json: { errors: @school.errors.full_messages }, status: :unprocessable_entity
+  #       raise ActiveRecord::Rollback
+  #     end
+  #   end
+  # rescue ActiveRecord::RecordInvalid => e
+  #   render json: { error: e.message }, status: :unprocessable_entity
+  # end
+
+
   def create
     ActiveRecord::Base.transaction do
-      # Ensure the group school is handled when part_of_group_school is true
       if params[:school][:part_of_group_school] && params[:school][:group_school_id].blank?
         render json: { error: 'Group school must be provided if the school is part of a group' }, status: :unprocessable_entity
         raise ActiveRecord::Rollback
       end
 
-      # Find or create group school if part_of_group_school is true and group_school_id is provided
       group_school = nil
       if params[:school][:part_of_group_school]
         group_school = School.find_by(id: params[:school][:group_school_id])
@@ -47,27 +86,23 @@ class Api::SchoolsController < ApplicationController
         end
       end
 
-      # Create the school with provided params, including group_school_id if applicable
       @school = School.new(school_params.merge(group_school_id: group_school&.id))
 
       if @school.save
-        # If contacts data is provided, create or update the contacts for the school
-        contacts = if params[:school][:contacts].present?
-                     create_or_update_contacts(params[:school][:contacts], @school.id)
-                   else
-                     []
-                   end
-
-        # Return school data along with contacts
-        render json: { school: format_school_data(@school), contacts: contacts }, status: :created
+        begin
+          contacts = create_or_update_contacts(params[:school][:contacts], @school.id) if params[:school][:contacts].present?
+          render json: { school: format_school_data(@school), contacts: contacts }, status: :created
+        rescue ActiveRecord::Rollback => e
+          render json: { error: e.message }, status: :unprocessable_entity
+          raise ActiveRecord::Rollback
+        end
       else
         render json: { errors: @school.errors.full_messages }, status: :unprocessable_entity
         raise ActiveRecord::Rollback
       end
     end
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { error: e.message }, status: :unprocessable_entity
   end
+
 
   # PATCH/PUT /schools/:id
   def update
@@ -238,20 +273,42 @@ class Api::SchoolsController < ApplicationController
     )
   end
 
+  # def create_or_update_contacts(contacts_params, school_id)
+  #   contacts_params.map do |contact_data|
+  #     # Look for an existing contact by mobile
+  #     existing_contact = Contact.find_by(mobile: contact_data[:mobile])
+
+  #     if existing_contact
+  #       # Update contact details and associate with the correct school_id
+  #       existing_contact.update!(
+  #         contact_name: contact_data[:contact_name],
+  #         decision_maker: contact_data[:decision_maker],
+  #         designation: contact_data[:designation],
+  #         school_id: school_id 
+  #       )
+  #       existing_contact
+  #     else
+  #       # Create a new contact if it doesn't exist
+  #       Contact.create!(
+  #         contact_name: contact_data[:contact_name],
+  #         mobile: contact_data[:mobile],
+  #         decision_maker: contact_data[:decision_maker],
+  #         designation: contact_data[:designation],
+  #         school_id: school_id
+  #       )
+  #     end
+  #   end
+  # end
+
+
   def create_or_update_contacts(contacts_params, school_id)
     contacts_params.map do |contact_data|
-      # Look for an existing contact by mobile
+      # Check if a contact with the same mobile number already exists
       existing_contact = Contact.find_by(mobile: contact_data[:mobile])
 
       if existing_contact
-        # Update contact details and associate with the correct school_id
-        existing_contact.update!(
-          contact_name: contact_data[:contact_name],
-          decision_maker: contact_data[:decision_maker],
-          designation: contact_data[:designation],
-          school_id: school_id 
-        )
-        existing_contact
+        # Prevent creating a duplicate contact
+        raise ActiveRecord::Rollback, "Contact with mobile number #{contact_data[:mobile]} already exists"
       else
         # Create a new contact if it doesn't exist
         Contact.create!(
@@ -264,6 +321,7 @@ class Api::SchoolsController < ApplicationController
       end
     end
   end
+
 
   def create_or_find_group_school(group_school_params)
     return unless group_school_params
