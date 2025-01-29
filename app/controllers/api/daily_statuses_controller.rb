@@ -39,10 +39,17 @@ module Api
       )
     end
 
-    def pagination 
-      @daily_statuses = DailyStatus.page(params[:page]).per(5000)
-      render json: @daily_statuses
+    def pagination
+      per_page = params[:per_page] || 5000
+      @daily_statuses = DailyStatus.page(params[:page]).per(per_page)
+      render json: {
+        data: @daily_statuses,
+        current_page: @daily_statuses.current_page,
+        total_pages: @daily_statuses.total_pages,
+        total_count: @daily_statuses.total_count
+      }
     end
+
 
     # GET /daily_statuses/:id
     def show
