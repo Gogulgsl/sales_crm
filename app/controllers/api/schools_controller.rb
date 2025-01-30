@@ -23,6 +23,34 @@ class Api::SchoolsController < ApplicationController
     render json: schools.map { |school| format_school_data(school) }, status: :ok
   end
 
+  def pagination
+    per_page = params[:per_page] || 500
+
+    schools = case current_user.role
+              when 'admin', 'vp_sales'
+                School.includes(:group_school).page(params[:page]).per(per_page)
+              when 'sales_head'
+                reporting_users = User.where(reporting_manager_id: current_user.id).pluck(:id)
+                relevant_user_ids = [current_user.id] + reporting_users
+                School.includes(:group_school)
+                      .where(id: Opportunity.where(user_id: relevant_user_ids).pluck(:school_id))
+                      .page(params[:page]).per(per_page)
+              when 'sales_executive'
+                School.includes(:group_school)
+                      .where(id: Opportunity.where(user_id: current_user.id).pluck(:school_id))
+                      .page(params[:page]).per(per_page)
+              else
+                return render json: { error: 'Unauthorized access' }, status: :forbidden
+              end
+
+    render json: {
+      data: schools.map { |school| format_school_data(school) }, # Format as required
+      current_page: schools.current_page,
+      total_pages: schools.total_pages,
+      total_count: schools.total_count
+    }, status: :ok
+  end
+
   # GET /schools/:id
   def show
     render json: format_school_data(@school)
