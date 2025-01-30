@@ -50,8 +50,7 @@ class Api::OpportunitiesController < ApplicationController
 
     render json: {
       data: opportunities.as_json(
-        include: [:product, :school, :user, :contact], 
-        methods: [:createdby_username]  
+        include: [:product, :school, :user, :contact]
       ),
       current_page: opportunities.current_page,
       total_pages: opportunities.total_pages,
