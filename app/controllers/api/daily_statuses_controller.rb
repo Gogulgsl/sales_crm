@@ -114,14 +114,13 @@ module Api
 
     # PATCH/PUT /daily_statuses/:id
     def update
-      @daily_status.updatedby_user_id = current_user.id # Update updatedby_user_id
+      if @daily_status.update(daily_status_update_params)
+        # Update the last_stage in the related opportunity
+        if @daily_status.opportunity.present?
+          @daily_status.opportunity.update(last_stage: @daily_status.stage)
+        end
 
-      if daily_status_params[:status].present? && !%w[pending approved rejected].include?(daily_status_params[:status])
-        return render json: { error: 'Invalid status value' }, status: :unprocessable_entity
-      end
-
-      if @daily_status.update(daily_status_params)
-        render json: @daily_status, status: :ok
+        render json: { message: 'Daily status updated successfully', daily_status: @daily_status }, status: :ok
       else
         render json: { error: 'Failed to update daily status', details: @daily_status.errors }, status: :unprocessable_entity
       end
@@ -229,6 +228,10 @@ module Api
         :discussion_point, :next_steps, :stage, :decision_maker_contact_id,
         :person_met_contact_id, :school_id, :status
       )
+    end
+
+    def daily_status_update_params
+      params.require(:daily_status).permit(:discussion_point, :next_steps, :stage)
     end
   end
 end
