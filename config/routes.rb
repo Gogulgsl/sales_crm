@@ -20,6 +20,7 @@ Rails.application.routes.draw do
         get :active_schools
         get :head_quarters
         post :import_file
+        get :pagination
       end
       member do
         get :contacts
