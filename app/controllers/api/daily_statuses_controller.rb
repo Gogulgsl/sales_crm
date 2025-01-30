@@ -41,15 +41,47 @@ module Api
 
     def pagination
       per_page = params[:per_page] || 500
-      @daily_statuses = DailyStatus.page(params[:page]).per(per_page)
+
+      @daily_statuses = if current_user.role.in?(%w[admin vp_sales])
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
+                                     .page(params[:page])
+                                     .per(per_page)
+                        elsif current_user.role == 'sales_head'
+                          reporting_users = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
+                                     .where(user_id: [current_user.id] + reporting_users)
+                                     .page(params[:page])
+                                     .per(per_page)
+                        elsif current_user.role == 'sales_executive'
+                          DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
+                                     .where(user_id: current_user.id)
+                                     .page(params[:page])
+                                     .per(per_page)
+                        else
+                          return render json: { error: 'Unauthorized access' }, status: :forbidden
+                        end
+
       render json: {
-        data: @daily_statuses,
+        data: @daily_statuses.as_json(
+          include: {
+            decision_maker_contact: { only: [:id, :contact_name, :mobile, :decision_maker, :designation] },
+            person_met_contact: { only: [:id, :contact_name, :mobile, :decision_maker, :designation] },
+            user: { only: [:id, :username] },
+            school: { only: [:id, :name, :email] },
+            opportunity: {
+              only: [:id, :opportunity_name],
+              include: {
+                product: { only: [:id, :product_name] }
+              }
+            }
+          },
+          methods: [:createdby_username] # Include the salesperson's name
+        ),
         current_page: @daily_statuses.current_page,
         total_pages: @daily_statuses.total_pages,
         total_count: @daily_statuses.total_count
       }
     end
-
 
     # GET /daily_statuses/:id
     def show
