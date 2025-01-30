@@ -44,17 +44,20 @@ module Api
 
       @daily_statuses = if current_user.role.in?(%w[admin vp_sales])
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
+                                     .order(updated_at: :desc)
                                      .page(params[:page])
                                      .per(per_page)
                         elsif current_user.role == 'sales_head'
                           reporting_users = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
                                      .where(user_id: [current_user.id] + reporting_users)
+                                     .order(updated_at: :desc)
                                      .page(params[:page])
                                      .per(per_page)
                         elsif current_user.role == 'sales_executive'
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
                                      .where(user_id: current_user.id)
+                                     .order(updated_at: :desc)
                                      .page(params[:page])
                                      .per(per_page)
                         else
@@ -75,7 +78,7 @@ module Api
               }
             }
           },
-          methods: [:createdby_username] # Include the salesperson's name
+          methods: [:createdby_username] 
         ),
         current_page: @daily_statuses.current_page,
         total_pages: @daily_statuses.total_pages,
@@ -90,7 +93,7 @@ module Api
           decision_maker_contact: { only: [:id, :contact_name, :mobile, :decision_maker] },
           person_met_contact: { only: [:id, :contact_name, :mobile, :decision_maker] }
         },
-        methods: [:createdby_username] # Include the salesperson's name
+        methods: [:createdby_username] 
       )
     end
 

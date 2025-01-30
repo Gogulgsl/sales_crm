@@ -34,15 +34,19 @@ class Api::OpportunitiesController < ApplicationController
 
     opportunities = case current_user.role
                     when 'admin', 'vp_sales'
-                      Opportunity.includes(:product, :school, :user, :contact).page(params[:page]).per(per_page)
+                      Opportunity.includes(:product, :school, :user, :contact)
+                      .order(updated_at: :desc)
+                      .page(params[:page]).per(per_page)
                     when 'sales_head'
                       reporting_executives = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
                       Opportunity.includes(:product, :school, :user, :contact)
                                  .where(user_id: [current_user.id] + reporting_executives)
+                                 .order(updated_at: :desc)
                                  .page(params[:page]).per(per_page)
                     when 'sales_executive'
                       Opportunity.includes(:product, :school, :user, :contact)
                                  .where(user_id: current_user.id)
+                                 .order(updated_at: :desc)
                                  .page(params[:page]).per(per_page)
                     else
                       return render json: { error: 'Unauthorized access' }, status: :forbidden

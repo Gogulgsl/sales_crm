@@ -28,16 +28,18 @@ class Api::SchoolsController < ApplicationController
 
     schools = case current_user.role
               when 'admin', 'vp_sales'
-                School.includes(:group_school).page(params[:page]).per(per_page)
+                School.includes(:group_school).order(updated_at: :desc).page(params[:page]).per(per_page)
               when 'sales_head'
                 reporting_users = User.where(reporting_manager_id: current_user.id).pluck(:id)
                 relevant_user_ids = [current_user.id] + reporting_users
                 School.includes(:group_school)
                       .where(id: Opportunity.where(user_id: relevant_user_ids).pluck(:school_id))
+                      .order(updated_at: :desc)
                       .page(params[:page]).per(per_page)
               when 'sales_executive'
                 School.includes(:group_school)
                       .where(id: Opportunity.where(user_id: current_user.id).pluck(:school_id))
+                      .order(updated_at: :desc)
                       .page(params[:page]).per(per_page)
               else
                 return render json: { error: 'Unauthorized access' }, status: :forbidden
