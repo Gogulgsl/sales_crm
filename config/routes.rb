@@ -32,6 +32,7 @@ Rails.application.routes.draw do
         get :active_opportunities
         get :logs
         post :import_file
+        get :pagination
       end
     end
     resources :auth, only: [] do
