@@ -29,6 +29,36 @@ class Api::OpportunitiesController < ApplicationController
     render json: opportunities.as_json(include: [:product, :school, :user, :contact]), status: :ok
   end
 
+  def pagination
+    per_page = params[:per_page] || 500
+
+    opportunities = case current_user.role
+                    when 'admin', 'vp_sales'
+                      Opportunity.includes(:product, :school, :user, :contact).page(params[:page]).per(per_page)
+                    when 'sales_head'
+                      reporting_executives = SalesTeam.where(manager_user_id: current_user.id).pluck(:user_id)
+                      Opportunity.includes(:product, :school, :user, :contact)
+                                 .where(user_id: [current_user.id] + reporting_executives)
+                                 .page(params[:page]).per(per_page)
+                    when 'sales_executive'
+                      Opportunity.includes(:product, :school, :user, :contact)
+                                 .where(user_id: current_user.id)
+                                 .page(params[:page]).per(per_page)
+                    else
+                      return render json: { error: 'Unauthorized access' }, status: :forbidden
+                    end
+
+    render json: {
+      data: opportunities.as_json(
+        include: [:product, :school, :user, :contact], 
+        methods: [:createdby_username]  
+      ),
+      current_page: opportunities.current_page,
+      total_pages: opportunities.total_pages,
+      total_count: opportunities.total_count
+    }, status: :ok
+  end
+
   # GET /api/opportunities/:id
   def show
     render json: @opportunity.as_json(include: [:product, :school, :user, :contact]), status: :ok
