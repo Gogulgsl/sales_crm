@@ -40,7 +40,7 @@ module Api
     end
 
     def pagination
-      per_page = params[:per_page] || 5000
+      per_page = params[:per_page] || 500
       @daily_statuses = if current_user.role.in?(%w[admin vp_sales])
                           DailyStatus.includes(:decision_maker_contact, :person_met_contact, :user, :school, opportunity: :product)
                                      .page(params[:page]).per(per_page)
