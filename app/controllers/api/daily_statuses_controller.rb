@@ -98,19 +98,49 @@ module Api
     end
 
     # POST /daily_statuses
+    # def create
+    #   @daily_status = DailyStatus.new(daily_status_params)
+    #   @daily_status.createdby_user_id = current_user.id
+    #   @daily_status.updatedby_user_id = current_user.id
+    #   @daily_status.createdby_username = current_user.username # Store salesperson name
+    #   @daily_status.status = 'pending' # Default status when created
+
+    #   if @daily_status.save
+    #     render json: @daily_status, status: :created
+    #   else
+    #     render json: @daily_status.errors, status: :unprocessable_entity
+    #   end
+    # end
+
+
+    # POST /daily_statuses
     def create
-      @daily_status = DailyStatus.new(daily_status_params)
-      @daily_status.createdby_user_id = current_user.id
+      # Find an existing DSR for the same user, opportunity, and school (ignoring date)
+      @daily_status = DailyStatus.find_or_initialize_by(
+        user_id: daily_status_params[:user_id],
+        opportunity_id: daily_status_params[:opportunity_id],
+        school_id: daily_status_params[:school_id]
+      )
+
+      # Assign new values (whether updating or creating)
+      @daily_status.assign_attributes(daily_status_params)
+      @daily_status.createdby_user_id ||= current_user.id # Set creator only if new
       @daily_status.updatedby_user_id = current_user.id
-      @daily_status.createdby_username = current_user.username # Store salesperson name
-      @daily_status.status = 'pending' # Default status when created
+      @daily_status.createdby_username ||= current_user.username # Set salesperson name only if new
+      @daily_status.status ||= 'pending' # Default status if not set
 
       if @daily_status.save
-        render json: @daily_status, status: :created
+        # Update last_stage in Opportunity when a stage change occurs
+        if @daily_status.opportunity.present?
+          @daily_status.opportunity.update(last_stage: @daily_status.stage)
+        end
+
+        render json: { message: 'Daily status saved successfully', daily_status: @daily_status }, status: :ok
       else
-        render json: @daily_status.errors, status: :unprocessable_entity
+        render json: { error: 'Failed to save daily status', details: @daily_status.errors }, status: :unprocessable_entity
       end
     end
+
 
     # PATCH/PUT /daily_statuses/:id
     def update
